@@ -1,0 +1,38 @@
+import { useEffect, useState } from 'react';
+import { request, query } from './api';
+import { findingsShape, metadataShape, mlShape } from './contracts';
+import { Message, Table, Pagination, Field, Select, useAction } from './ui';
+export function Freshness({ data }) {
+  return <Message>{!data.evaluation ? 'Not evaluated. Run an explicit evaluation.' : `${data.stale ? 'Stale — reevaluation required.' : 'Matches inputs checked at evaluation read.'} Evaluated: ${data.evaluation.evaluatedAt}. Checked: ${data.evaluation.checkedAt}.`}</Message>;
+}
+export function Summary({ data }) {
+  return <><Freshness data={data} />{data.summary && <><div className="cards">{Object.entries(data.summary.findingsBySeverity).map(([key, value]) => <article key={key}><span>{key} findings</span><strong>{value}</strong></article>)}</div><p>{data.summary.violations} deterministic mismatches · {data.summary.manualReviewItems} manual review items. Counts refer to findings, not unique students.</p><h3>Policy-based intake comparisons</h3><Table headings={['Programme / year', 'Approved seats', 'Counted enrolment', 'Unresolved', 'Outcome']}>{data.summary.intakeComparisons.map((row, i) => <tr key={i}><td>{row.programmeId}<br />{row.academicYear}</td><td>{row.approvedSeats ?? 'Unknown'}</td><td>{row.countedEnrolment ?? 'Policy unavailable'}</td><td>{row.unresolvedRecords}</td><td>{row.comparison}</td></tr>)}</Table>{!data.summary.intakeComparisons.length && <p>No programme/year comparisons available.</p>}<p>A capacity result is not an overall compliance certification. Missing policies and unresolved records require review.</p></>}</>;
+}
+export function Compliance() {
+  const [data, setData] = useState(null); const [page, setPage] = useState(1); const [severity, setSeverity] = useState(''); const [revision, setRevision] = useState(0); const action = useAction();
+  useEffect(() => { let alive = true; setData(null); action.run(async () => { const result = await request(`/v1/compliance/findings?${query({ page, pageSize: 20, severity })}`, { validate: findingsShape }); if (alive) setData(result); }); return () => { alive = false; }; }, [page, severity, revision]);
+  async function evaluate() { const saved = await action.run(async () => { await request('/v1/compliance/evaluate', { method: 'POST', body: {}, validate: metadataShape }); return true; }); if (saved) setRevision(r => r + 1); }
+  return <section><div className="section-heading"><h2>Deterministic compliance</h2><button disabled={action.busy} onClick={evaluate}>Evaluate institution</button></div><p>Findings compare records against configured prototype rules. They do not establish fraud or official identity.</p>
+    {action.busy && <Message>Loading compliance…</Message>}{action.error && <Message error>{action.error}</Message>}{data && <><Summary data={data} /><Select label="Severity filter" options={['', 'info', 'warning', 'critical']} value={severity} disabled={action.busy} onChange={e => { setPage(1); setSeverity(e.target.value); }} /><Table headings={['Severity / rule', 'Type', 'Context', 'Explanation and action']}>{data.findings.map(f => <tr key={f.id}><td><span className={`badge ${f.severity}`}>{f.severity}</span><br />{f.ruleCode}</td><td>{f.kind === 'violation' ? 'Deterministic mismatch' : 'Requires human review'}</td><td>{f.institutionId}<br />{f.programmeId || 'Institution / record'}<br />{f.academicYear || 'Year unresolved'}</td><td>{f.explanation}<p>{f.recommendedAction}</p></td></tr>)}</Table>{!data.findings.length && <Message>No findings on this page. This is not official verification.</Message>}<Pagination page={page} total={data.total} disabled={action.busy} onChange={setPage} /></>}
+  </section>;
+}
+export function Ml({ result, onResult }) {
+  const [filters, setFilters] = useState({ programmeId: '', academicYear: '' }); const action = useAction();
+  async function evaluate(e) { e.preventDefault(); await action.run(async () => {
+    onResult(null);
+    const body = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    try { onResult(await request('/v1/ml/evaluate', { method: 'POST', body, validate: mlShape })); }
+    catch (error) { if (error.status !== 401) onResult({ status: 'failed', results: [] }); throw error; }
+  }); }
+  return <section className="ml"><h2>ML anomaly review</h2><p>Separate from deterministic compliance. Synthetic-model scores describe unusual aggregate patterns, not probabilities or fraud. Every flag requires human review.</p><form onSubmit={evaluate}><fieldset disabled={action.busy} className="filters"><Field label="Programme ID (optional)" value={filters.programmeId} onChange={e => setFilters({ ...filters, programmeId: e.target.value })} /><Field label="Academic year (optional)" value={filters.academicYear} onChange={e => setFilters({ ...filters, academicYear: e.target.value })} /><button>Run ML analysis</button></fieldset></form>
+    {action.busy && <Message>Analysis in progress…</Message>}{action.error && <Message error>{action.error} No normal result has been assigned.</Message>}
+    {!result && !action.busy && !action.error && <Message>No ML analysis performed in this session.</Message>}
+    {result?.status === 'failed' && !action.error && <Message error>Previous ML analysis could not be completed. No normal result has been assigned. Retry when the service is available.</Message>}
+    {result && result.status !== 'failed' && <><Message>{result.status === 'no_data' ? 'No eligible groups — no assessment performed.' : 'ML analysis completed.'} {result.stale ? 'Stale: rerun after data changes.' : 'Freshness checked only during this analysis.'}</Message><p>Model: {result.modelVersion || 'Not assessed'} · Threshold: {result.threshold ?? 'Not assessed'} · Skipped records: {result.skippedRecords}</p><Table headings={['Programme / year', 'Anomaly score', 'Review flag', 'Missing features']}>{result.results.map((r, i) => <tr key={i}><td>{r.programmeId}<br />{r.academicYear}</td><td>{r.anomalyScore.toFixed(4)}</td><td>{r.reviewFlag ? 'Human review required' : 'Below model threshold'}</td><td>{r.missingFeatures.join(', ') || 'None'}</td></tr>)}</Table><p>Results are held only in memory. Reevaluate after changes, including changes made in other sessions.</p></>}
+  </section>;
+}
+export function Dashboard({ navigate, mlResult }) {
+  const [data, setData] = useState(null); const action = useAction();
+  useEffect(() => { let alive = true; action.run(async () => { const [students, compliance] = await Promise.all([request('/v1/students?page=1&pageSize=1', { validate: d => Number.isInteger(d.total) && d.total >= 0 }), request('/v1/compliance/summary', { validate: metadataShape })]); if (alive) setData({ students, compliance }); }); return () => { alive = false; }; }, []);
+  return <section><h2>Institution overview</h2><p>Only your institution's records are included.</p>{action.busy && <Message>Loading overview…</Message>}{action.error && <Message error>{action.error}</Message>}{data && <><div className="cards"><article><span>Student records</span><strong>{data.students.total}</strong></article><article><span>ML status · current session</span><strong>{mlResult ? mlResult.status : 'Not run'}</strong>{mlResult?.status === 'evaluated' && <span>{mlResult.results.filter(r => r.reviewFlag).length} review flags{mlResult.stale ? ' · stale' : ''}</span>}</article></div>{!data.students.total && <Message>No student records yet. Create fictional records or preview a demo CSV.</Message>}<Summary data={data.compliance} /></>}<div className="actions">{['Students', 'CSV import', 'Compliance', 'ML review'].map(name => <button key={name} onClick={() => navigate(name)}>{name}</button>)}</div></section>;
+}

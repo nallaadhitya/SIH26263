@@ -1,0 +1,54 @@
+# Dependencies and build artifacts
+node_modules/
+.local/
+data/backups/
+*.sql
+!backend/storage/migrations/*.sql
+*.sql.gz
+*.dump
+*.zip
+backend/test/.tmp-mysql-*/
+dist/
+build/
+coverage/
+.vite/
+.npm-cache/
+frontend/.tmp-smoke-*/
+
+# Python environments and artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+ml-service/artifacts/
+ml-service/tests/.tmp-*/
+backend/test/.tmp-ml-data/
+backend/test/.tmp-ml-smoke-*/
+backend/test/.tmp-verification-*/
+backend/test/.tmp-review-data/
+frontend/.tmp-e2e-*/
+frontend/test-results/
+frontend/playwright-report/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local prototype runtime data, logs, and editor files
+data/local/*
+!data/local/.gitkeep
+backend/test/.tmp-data/
+backend/test/.tmp-seed-data/
+backend/test/.tmp-auth-data/
+backend/test/.tmp-students-data/
+backend/test/.tmp-compliance-data/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
