@@ -12,7 +12,7 @@ const artifact = { artifactId: id, revision: '22222222-2222-4222-8222-2222222222
   payload: '{"fictionalSignedArtifact":"test"}', qrDataUrl: 'data:image/png;base64,iVBORw0KGgo=', officialApaarAuthenticity: 'not_verified' };
 function response(body, status = 200) { return { ok: status >= 200 && status < 300, status,
   headers: new Headers({ 'content-type': 'application/json' }), json: async () => body }; }
-beforeEach(() => { clearSession(); setSessionHandler(() => {}); });
+beforeEach(() => { window.history.replaceState({}, '', '/login'); clearSession(); setSessionHandler(() => {}); });
 
 describe('issuance', () => {
   it('issues only a record reference, renders QR/download/payload and confirms revocation', async () => {
@@ -81,10 +81,10 @@ describe('public verification', () => {
     expect(fetch.mock.calls.every(([url]) => url.startsWith('/api/auth/'))).toBe(true);
     expect(screen.queryByText('Issue QR artifact')).not.toBeInTheDocument();
   });
-  it('reviewers get verification navigation without issuance or restricted data calls', async () => {
-    const fetch = vi.fn(async url => url.endsWith('/csrf') ? response({ csrfToken: 'a'.repeat(64) }) : response({ user: { id: 'reviewer', displayName: 'Fictional Reviewer', role: 'regulatory_reviewer' } })); vi.stubGlobal('fetch', fetch);
-    render(<App />); await userEvent.click(await screen.findByRole('button', { name: 'Verification' }));
+  it('verifiers receive the limited verification portal without issuance or student access', async () => {
+    const fetch = vi.fn(async url => url.endsWith('/csrf') ? response({ csrfToken: 'a'.repeat(64) }) : response({ user: { id: 'verifier', displayName: 'Fictional Verifier', role: 'authorized_verifier' } })); vi.stubGlobal('fetch', fetch);
+    render(<App />); expect(await screen.findByRole('heading', { name: 'Authorized artifact review' })).toBeInTheDocument();
     expect(screen.getByLabelText('QR payload')).toBeInTheDocument(); expect(screen.queryByText('Issue QR artifact')).not.toBeInTheDocument();
-    await waitFor(() => expect(fetch.mock.calls.every(([url]) => url.startsWith('/api/auth/'))).toBe(true));
+    await waitFor(() => expect(fetch.mock.calls.every(([url]) => !url.includes('/students'))).toBe(true));
   });
 });

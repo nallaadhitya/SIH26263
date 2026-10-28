@@ -23,6 +23,7 @@ Express defaults to `http://127.0.0.1:5000`; Vite forwards same-origin `/api` re
 | POST `/api/v1/verification/issue` | Admin/operator + CSRF; own `studentId`; persist artifact before returning signed text/PNG |
 | POST `/api/v1/verification/revoke` | Admin/operator + CSRF; own `artifactId`; idempotent withdrawal |
 | POST `/api/v1/verification/verify` | Public; exact signed `payload`; minimal integrity/current-state result |
+| GET `/api/v1/regulatory/summary` | Regulatory reviewer only; de-identified institution aggregates and an aggregate count of potential active cross-institution identifier conflicts; no student records or identifiers |
 
 Protected mutations require the current `X-CSRF-Token` and an allowed browser Origin. Login email is normalized; unknown/inactive accounts use the same safe error. Institution overrides cannot expand access; foreign student IDs appear absent (404). Invalid bodies/filters use 400/422, duplicates/conflicts 409, denied access 401/403, limits 429 and unavailable DB/ML/key services explicit 5xx. Unexpected errors do not echo SQL, credentials or records. See the detailed [auth](auth-policy.md), [students](students-api.md), [compliance](compliance-api.md), [ML](ml-service.md) and [QR](verification.md) contracts for exact schemas and exceptions.
 

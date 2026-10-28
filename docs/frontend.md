@@ -12,7 +12,8 @@ React function components, JavaScript and plain CSS run through Vite. No large U
 
 - `frontend/src/api.js`: same-origin API base, credentialed fetch, 15-second timeout, in-memory CSRF, safe status errors and session-expiry notification. Old in-flight responses are discarded after a session change. Mutations are never automatically retried.
 - `contracts.js`: validates response fields consumed by views before rendering.
-- `App.jsx`: authentication bootstrap, login/logout, user identity, role-aware navigation and in-memory ML result lifecycle.
+- `App.jsx`: history-based public routes (`/`, `/login`, `/verify`, `/workspace`), authentication bootstrap, login/logout, user identity, role-aware navigation and in-memory ML result lifecycle.
+- `Landing.jsx`: public institutional landing page with capability, workflow, security, and prototype-limit disclosures. It has no live statistics or privileged API calls.
 - `students.jsx`: paginated exact filters, detail, create/edit validation and writable-field allowlist.
 - `Import.jsx`: bounded file selection, row classifications, explicit native-modal confirmation, server-confirmed import result and uncertain-commit recovery.
 - `Reviews.jsx`: live institution overview, saved deterministic findings and freshness, policy-based capacity comparisons, separate explicit ML evaluation.
@@ -43,4 +44,4 @@ Use the exact PowerShell setup/start/test commands in README. Frontend tests exe
 
 Native labels, buttons, semantic tables, live status/alert regions, skip link, visible focus, responsive overflow and a native modal support keyboard access. jsdom does not replace browser/screen-reader testing. Phase 8's Chrome workflow checks actual keyboard/dialog behavior and desktop/mobile rendering; it does not certify all assistive technology or contrast requirements. Test fixtures use mocked HTTP only for component tests; the separate HTTP smoke tests real Express contracts. The Phase 5 ML smoke and Phase 8 browser workflow test real Python inference.
 
-Navigation and form drafts are memory-only; reload returns to the overview and rechecks the session. There are no deep-link routes, reference-edit APIs, autosave, realtime cross-tab synchronization, production hosting or durable ML history. Sessions and rate limits remain in memory. QR and explicitly selected MySQL are implemented in Phases 7/9 as described above; official APAAR APIs and production deployment remain deferred. [Phase 10 acceptance](final-acceptance.md) records the current MySQL-backed browser results, including ML stop/recovery.
+Navigation and form drafts are memory-only. Public routes remain available on refresh; `/workspace` rechecks the session and redirects an unauthenticated visitor to `/login`. There are no reference-edit APIs, autosave, realtime cross-tab synchronization, production hosting or durable ML history. Sessions and rate limits remain in memory. QR and explicitly selected MySQL are implemented in Phases 7/9 as described above; official APAAR APIs and production deployment remain deferred. [Phase 10 acceptance](final-acceptance.md) records the current MySQL-backed browser results, including ML stop/recovery.

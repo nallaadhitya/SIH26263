@@ -4,14 +4,14 @@ Phase 9 changes persistence, not permissions. MySQL stores the same public accou
 
 `GET /api/auth/me` exposes the caller's public account profile. Phase 3 adds institution-scoped student APIs under `/api/v1/students`. Login, logout, and CSRF bootstrap retain `/api/auth/` as explicitly requested.
 
-Student and compliance access use explicitly scoped capabilities. Cross-institution regulatory summaries remain deferred. Phase 7 adds a minimal public artifact-status check, with separate institution-scoped issuance/revocation permissions.
+Student and compliance access use explicitly scoped capabilities. The regulatory capability now authorizes only the deliberately de-identified institution aggregates at `GET /api/v1/regulatory/summary`; it does not authorize student, compliance-finding, or verifier-record browsing. Phase 7 adds a minimal public artifact-status check, with separate institution-scoped issuance/revocation permissions.
 
 | Role | Reserved capabilities | Institution restriction |
 | --- | --- | --- |
 | institution_admin | institution:read, institution:manage, student:read:own, student:write:own, student:import:own, compliance:read:own, compliance:evaluate:own, ml:evaluate:own, verification:issue:own, verification:revoke:own | Own institution only |
 | institution_operator | institution:read, student:read:own, student:write:own, student:import:own, compliance:read:own, compliance:evaluate:own, ml:evaluate:own, verification:issue:own, verification:revoke:own | Own institution only |
-| regulatory_reviewer | regulatory:summary | Only a future explicitly designed, aggregate/de-identified summary; no raw records |
-| authorized_verifier | verification:request (reserved) | Public artifact-status check only, also available anonymously; no student browsing |
+| regulatory_reviewer | regulatory:summary | De-identified institution summary only; no raw records or identifiers |
+| authorized_verifier | verification:request (reserved) | Limited signed-artifact status checker; no student browsing |
 
 No role receives unrestricted `student:read`. Reviewers and verifiers cannot list, retrieve, create, update, preview, or import student records. Undefined roles or permissions are denied. Institution accounts must reference an existing institution at login and on subsequent requests. API input cannot choose the authenticated role or institution. Phase 3 explicitly permits both institution admins and operators to manage their own students; it does not grant operators general institution-management permission.
 

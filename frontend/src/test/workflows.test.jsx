@@ -24,7 +24,25 @@ function mockApi(routes = {}) {
     throw new Error(`Unexpected request: ${url}`);
   }); vi.stubGlobal('fetch', fetch); return fetch;
 }
-beforeEach(() => { api.clearSession(); api.setSessionHandler(() => {}); });
+beforeEach(() => { window.history.replaceState({}, '', '/login'); api.clearSession(); api.setSessionHandler(() => {}); });
+
+describe('public landing routes', () => {
+  it('renders the public landing page and routes both primary calls to action', async () => {
+    window.history.replaceState({}, '', '/'); mockApi({ '/api/auth/me': () => response({}, 401) });
+    const actor = userEvent.setup(); render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Clearer academic data. More confident review.' })).toBeInTheDocument();
+    await actor.click(screen.getAllByRole('button', { name: 'Sign in to workspace' })[0]);
+    expect(await screen.findByRole('heading', { name: 'Sign in to your workspace' })).toBeInTheDocument();
+    window.history.replaceState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate'));
+    await actor.click(await screen.findByRole('button', { name: 'Verify an artifact' }));
+    expect(await screen.findByRole('heading', { name: 'Verify an EduVerify artifact' })).toBeInTheDocument();
+  });
+
+  it('redirects an anonymous protected workspace route to sign in', async () => {
+    window.history.replaceState({}, '', '/workspace'); mockApi({ '/api/auth/me': () => response({}, 401) }); render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Sign in to your workspace' })).toBeInTheDocument();
+  });
+});
 
 describe('session and role workflows', () => {
   it('logs in with CSRF, normalized email and cookie credentials; logs out', async () => {
@@ -44,10 +62,18 @@ describe('session and role workflows', () => {
     const actor = userEvent.setup(); render(<App />); await actor.type(await screen.findByLabelText('Email'), 'x@demo.example'); await actor.type(screen.getByLabelText('Password'), 'bad'); await actor.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password'); expect(screen.getByLabelText('Password')).toHaveValue(''); expect(screen.queryByText(/secret/)).not.toBeInTheDocument();
   });
-  it.each(['regulatory_reviewer', 'authorized_verifier', 'unknown_role'])('makes no restricted calls for %s', async role => {
-    const fetch = mockApi({ '/api/auth/me': { user: { ...user, role, institutionId: null } } }); render(<App />);
-    expect(await screen.findByText(/No student, compliance, aggregate or ML access/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Students' })).not.toBeInTheDocument(); expect(fetch.mock.calls.every(([url]) => url.startsWith('/api/auth/'))).toBe(true);
+  it('routes a reviewer to aggregate-only monitoring without student calls', async () => {
+    const regulatory = { generatedAt: '2026-10-28', scope: 'de_identified_institution_aggregates', totals: { institutions: 1, studentRecords: 2, activeEnrolment: 1, potentialCrossInstitutionConflicts: 0 }, institutions: [] };
+    const fetch = mockApi({ '/api/auth/me': { user: { ...user, role: 'regulatory_reviewer', institutionId: null } }, '/api/v1/regulatory/summary': regulatory }); render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Regulatory monitoring' })).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Students' })).not.toBeInTheDocument(); expect(fetch.mock.calls.some(([url]) => url.includes('/students'))).toBe(false);
+  });
+  it('routes an authorized verifier to the limited verification portal', async () => {
+    mockApi({ '/api/auth/me': { user: { ...user, role: 'authorized_verifier', institutionId: null } } }); render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Authorized artifact review' })).toBeInTheDocument(); expect(screen.getByLabelText('QR payload')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Students' })).not.toBeInTheDocument();
+  });
+  it('keeps unknown roles restricted', async () => {
+    const fetch = mockApi({ '/api/auth/me': { user: { ...user, role: 'unknown_role', institutionId: null } } }); render(<App />);
+    expect(await screen.findByText(/No student, compliance, aggregate or ML access/)).toBeInTheDocument(); expect(fetch.mock.calls.every(([url]) => url.startsWith('/api/auth/'))).toBe(true);
   });
   it.each(['institution_admin', 'institution_operator'])('shows permitted navigation for %s', async role => {
     mockApi({ '/api/auth/me': { user: { ...user, role } } }); render(<App />);

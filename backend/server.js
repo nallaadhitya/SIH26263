@@ -8,6 +8,7 @@ const { createStudentRouter } = require('./students/router');
 const { createComplianceRouter } = require('./compliance/router');
 const { createMlRouter } = require('./ml/router');
 const { createVerificationRouter } = require('./verification/router');
+const { createRegulatoryRouter } = require('./regulatory/router');
 const { AccessError } = require('./auth/policy');
 
 function createApp({ store = createStorage(), authOptions = {}, studentOptions = {}, complianceOptions = {}, mlOptions = {}, verificationOptions = {} } = {}) {
@@ -26,6 +27,7 @@ function createApp({ store = createStorage(), authOptions = {}, studentOptions =
   app.use('/api/v1/compliance', createComplianceRouter({ store, auth, ...complianceOptions }));
   app.use('/api/v1/ml', createMlRouter({ store, auth, ...mlOptions }));
   app.use('/api/v1/verification', createVerificationRouter({ store, auth, ...verificationOptions }));
+  app.use('/api/v1/regulatory', createRegulatoryRouter({ store, auth }));
 
   app.use((request, response) => {
     response.status(404).json({ error: 'Route not found' });
